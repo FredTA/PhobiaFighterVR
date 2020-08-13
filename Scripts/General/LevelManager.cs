@@ -2,9 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-//TODO - CORRECT DIAGRAM 
-//PSM is going to hold references to level managers, instead of their attatched GOs
-
 public abstract class LevelManager : MonoBehaviour {
 
     //TODO update diagram, can't have transform (just copies the reference, doesn't save the original), we need position, rot, scale
@@ -57,7 +54,7 @@ public abstract class LevelManager : MonoBehaviour {
             firstActivation = false;
         } else {
             //No need to do this for first activation, as they'll already be setup for the start of the level
-            setupGameobjects();
+            SetupGameobjects();
         }
     }
 
@@ -75,6 +72,7 @@ public abstract class LevelManager : MonoBehaviour {
     private void SaveGameobjectStates() {
         //Go through all GO's in the holder, and save their initial configs 
         foreach (Transform child in gameObjectsHolder.transform) {
+            //Level specific UI will be handled seperately
             if (child.gameObject.name == "Canvas") {
                 continue;
             }
@@ -88,7 +86,7 @@ public abstract class LevelManager : MonoBehaviour {
         }
     }
 
-    private void setupGameobjects() {
+    private void SetupGameobjects() {
         //Go through all GO's, return them to their initial states
         foreach (GameObjectState goState in gameObjectStates) {
             goState.gameObject.SetActive(goState.initialActive);
