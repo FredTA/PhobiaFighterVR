@@ -2,8 +2,37 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+//NEED TO DO WAITING FOR OTHER SPIDERS AND STOPPING WAITING
+//Option one, set timers, each frame check if timer is expired and then stop waiting 
+//A timer for normal wait, a timer for spider wait 
+//Option two, 
+
+
+//Okay, what about a nested structure? 
+//Enum for movement stages? 
+//Switch statement depending on which enum value we're on 
+//Random wait 
+//Random turn on spot 
+//Random wait 
+//WalkAndAvoid (surely easist with just changing a target position?) .. no.. direction, surely?
+    //Another enum for this stage? With another switch statement 
+    //spider can only avoid other spiders if we're on the right enum element 
+    //So walking, turning, avoiding? 
+    //On collisions enter, start turning
+    //On coll exit, start walking 
+    //At any time in this enum, we need to be checking for spider distances 
+        //If walking, set target direction away 
+        //If turning or avoiding, check other's enum 
+            //If other spider is walking, we can stop 
+            //If other spider isn't walking, the one with lowest priority stops 
+//What about a new system for turning? Instead of a target position, just turn each frame 
+//That way, we can instead use OnTriggerStay, and turn towards the centre of the table 
+//With some fine tuning, this should work so that they don't exit the collider actually pointing exactly towards the centre 
+//We will however still need a target position for th turn on the spot stages of the cycle 
+
 //TODO Sometimes we fall out of the borders (looks like it's when we're walking along the border, somehow), 
 //maybe change target dir to centre of table?
+
 public class PathController : MonoBehaviour {
     //---Randomization control---
     private const float BASE_ROTATION_SPEED = 1.2f;
@@ -46,13 +75,13 @@ public class PathController : MonoBehaviour {
     private const float RUNNING_ANIMATION_SPEED_MULTIPLIER = 0.7f;
     private const float TURNING_ANIMATION_SPEED_MULTIPLIER = 0.7f;
     private const float WALKING_ANIMATION_SPEED_MULTIPLIER = 0.7f;
-    private Spider animationController;
-    private Spider.SpiderAnimations pausedAnimation;
+    private SpiderAnimationController animationController;
+    private SpiderAnimationController.SpiderAnimations pausedAnimation;
     private float pausedAnimationSpeed;
     private bool animationPaused;
 
     void Awake() {
-        animationController = gameObject.GetComponent<Spider>();
+        animationController = gameObject.GetComponent<SpiderAnimationController>();
         spiders = GameObject.FindGameObjectsWithTag("SpiderCluster");
         tableCentrePosition = GameObject.FindGameObjectWithTag("TableCentre").transform.position;
     }
@@ -118,7 +147,7 @@ public class PathController : MonoBehaviour {
         else {
             float distance = (transform.position - spiderAvoidingUs.transform.position).magnitude; 
             if (distance > MINIMUM_SPIDER_DISTANCE) {
-                string pausedAnimationName = System.Enum.GetName(typeof(Spider.SpiderAnimations), (int)pausedAnimation);
+                string pausedAnimationName = System.Enum.GetName(typeof(SpiderAnimationController.SpiderAnimations), (int)pausedAnimation);
                 waitingForOtherSpiderToAvoid = false;
                 string debug = gameObject.name.ToUpper() + ": " + spiderAvoidingUs.gameObject.name + " is out of my way. ";
                 if (animationPaused) {
@@ -141,7 +170,7 @@ public class PathController : MonoBehaviour {
         }
             
     }
-
+    
     private GameObject FindClosestSpiderThatIsTooClose(out float closestDistance) {
         //Find the closest spider out of all the ones that are too close (if any)
         GameObject closestSpider = null;
@@ -180,18 +209,18 @@ public class PathController : MonoBehaviour {
 
     //Pause the current animation if neccessary
     private void HandleAnimationPause() {
-        Spider.SpiderAnimations currentAnimation = animationController.GetCurrentAnimation();
-        string currentAnimationName = System.Enum.GetName(typeof(Spider.SpiderAnimations), (int)pausedAnimation);
+        SpiderAnimationController.SpiderAnimations currentAnimation = animationController.GetCurrentAnimation();
+        string currentAnimationName = System.Enum.GetName(typeof(SpiderAnimationController.SpiderAnimations), (int)pausedAnimation);
         //string debug = gameObject.name.ToUpper() + " (" + priority + "): Going to wait for " + spider.gameObject.name + " (" + otherController.priority + "): " + " to move away: ";
 
         //We don't need to pause the animation if it's idle or turning, as the spider is staying in the same spot anyway
-        if (currentAnimation != Spider.SpiderAnimations.idle && currentAnimation != Spider.SpiderAnimations.turnleft &&
-            currentAnimation != Spider.SpiderAnimations.turnright) {
+        if (currentAnimation != SpiderAnimationController.SpiderAnimations.idle && currentAnimation != SpiderAnimationController.SpiderAnimations.turnleft &&
+            currentAnimation != SpiderAnimationController.SpiderAnimations.turnright) {
             animationPaused = true;
             pausedAnimation = currentAnimation;
             pausedAnimationSpeed = animationController.GetSpeed();
 
-            animationController.SetAnimation(Spider.SpiderAnimations.idle);
+            animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.idle);
             animationController.SetSpeed(1);
             //debug += "Pausing " + currentAnimationName;
         }
@@ -208,7 +237,7 @@ public class PathController : MonoBehaviour {
         //Debug.Log(gameObject.name + " is starting a new walking cycle...");
         //First wait-----
         ableToAvoidOtherSpiders = false; //Can't avoid other spiders if we're standing still (or turning on the spot)
-        animationController.SetAnimation(Spider.SpiderAnimations.idle);
+        animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.idle);
         yield return new WaitForSeconds(RandomWait());
         while (waitingForOtherSpiderToAvoid) {
             yield return null;
@@ -231,9 +260,9 @@ public class PathController : MonoBehaviour {
         //TODO Optimize this ^^ not super efficient to just keep rolling the dice until we get a number we like
 
         if (angle < 0) {
-            animationController.SetAnimation(Spider.SpiderAnimations.turnleft);
+            animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.turnleft);
         } else {
-            animationController.SetAnimation(Spider.SpiderAnimations.turnright);
+            animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.turnright);
         }
 
         float turnSpeed = Random.Range(TURN_ON_THE_SPOT_MIN_SPEED, TURN_ON_THE_SPOT_MAX_SPEED);
@@ -244,7 +273,7 @@ public class PathController : MonoBehaviour {
 
         //TODO Don't stop waiting if we're waiting fro other spider to avoid
         //Second wait---
-        animationController.SetAnimation(Spider.SpiderAnimations.idle);
+        animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.idle);
         yield return new WaitForSeconds(RandomWait());
         while (waitingForOtherSpiderToAvoid) {
             yield return null;
@@ -262,17 +291,18 @@ public class PathController : MonoBehaviour {
         randomWalkSpeed = BASE_SPEED * multiplier;
         randomRotateSpeed = BASE_ROTATION_SPEED * multiplier;
 
-        animationController.SetAnimation(Spider.SpiderAnimations.walking);
+        animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.walking);
         animationController.SetSpeed(multiplier * RUNNING_ANIMATION_SPEED_MULTIPLIER); //TODO tweak anim speed
         StartCoroutine("Walk");
     }
 
     private float RandomWait() {
-        float waitTime = Random.Range(MINIMUM_WAIT_TIME, MAXIMUM_WAIT_TIME);
+        
         animationController.SetSpeed(1);
-        animationController.SetAnimation(Spider.SpiderAnimations.idle);
+        animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.idle);
         //Debug.Log(gameObject.name.ToUpper() + ": Waiting for " + waitTime + " secs");
-        return waitTime;
+        //return waitTime;
+        return 1f;
     }
 
     private float SignedAngleBetween(Vector3 a, Vector3 b, Vector3 n) {
