@@ -1,8 +1,10 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public abstract class LevelManager : MonoBehaviour {
+
+    protected UIManager uiManager;
 
     //TODO update diagram, can't have transform (just copies the reference, doesn't save the original), we need position, rot, scale
     private struct GameObjectState {
@@ -25,10 +27,77 @@ public abstract class LevelManager : MonoBehaviour {
     public AudioSource voiceover;
     private bool firstActivation = true;
 
+    protected virtual bool PlayCorrectIncorrectSounds { get; set; }
+
+    private Text instructionsText;
+    private Text levelEndTitle;
+    private Text levelEndSubtitle;
 
     public virtual void Awake() {
         gameObjectsHolder = gameObject.transform.GetChild(0).gameObject;
         gameObjectsHolder.SetActive(false); //Ensure holders are inactive at first
+        uiManager = GameObject.Find("UI").GetComponent<UIManager>();
+
+        Transform canvas = transform.GetChild(0).GetChild(0);
+        instructionsText = canvas.GetChild(0).GetComponent<Text>();
+        levelEndTitle = canvas.GetChild(1).GetComponent<Text>();
+        levelEndSubtitle = canvas.GetChild(2).GetComponent<Text>();
+    }
+
+    private void ShowInstructionsText() {
+        instructionsText.enabled = true;
+        levelEndTitle.enabled = false;
+        levelEndSubtitle.enabled = false;
+    }
+
+    protected abstract void HandleLevelEnd();
+
+    protected virtual void ShowEndLevelText() {
+        instructionsText.enabled = false;
+        levelEndTitle.enabled = true;
+        levelEndSubtitle.enabled = true;
+        GenerateSubtitleAndTitleColour();
+    }
+
+    protected virtual void GenerateSubtitleAndTitleColour() {
+        string subtitle;
+        Color color;
+
+        if (score <= 40) {
+            subtitle = "Have another go";
+            color = Color.red;
+        }
+        else if (score <= 60) {
+            subtitle = "Nice one!";
+            color = new Color(255, 170, 0);
+        }
+        else if (score <= 80) {
+            subtitle = "Great work!";
+            color = new Color(170, 255, 0);
+        } 
+        else {
+            subtitle = "Perfect!";
+            color = Color.green;
+        }
+
+        SetEndLevelSubtitleText(subtitle);
+        SetEndLevelTitleColour(color);
+    }
+
+    protected virtual void SetEndLevelTitleText(string text) {
+        levelEndTitle.text = text;
+    }
+
+    protected virtual void SetEndLevelTitleColour(Color color) {
+        levelEndTitle.color = color;
+    }
+
+    protected virtual void SetEndLevelSubtitleText(string text) {
+        levelEndSubtitle.text = text;
+    }
+
+    protected virtual void SetEndLevelSubtitleColour(Color color) {
+        levelEndSubtitle.color = color;
     }
 
     public virtual void Start() {
@@ -37,7 +106,7 @@ public abstract class LevelManager : MonoBehaviour {
 
     // Update is called once per frame
     public virtual void Update() {
-        
+       
     }
 
     public void ActivateLevel() {
@@ -45,6 +114,7 @@ public abstract class LevelManager : MonoBehaviour {
         score = 0;
         timer = 0;
 
+        ShowInstructionsText();
         gameObjectsHolder.SetActive(true); //Will activate all GameObjects (that start active) in their initial configs
         voiceover.Play();
         //Debug.Log("First activation: " + firstActivation);
@@ -59,7 +129,7 @@ public abstract class LevelManager : MonoBehaviour {
     }
 
     //We can add reset level stuff here if we want to, maybe a specific "reset" sound or something 
-    public void ResetLevel() {
+    public virtual void ResetLevel() {
         ActivateLevel();
     }
 
@@ -101,7 +171,34 @@ public abstract class LevelManager : MonoBehaviour {
         }
     }
 
+    public virtual void SubmitAnswer(bool correct) {
+        if (PlayCorrectIncorrectSounds) {
+            if (correct) {
+                uiManager.PlayCorrectSound();
+            } else {
+                uiManager.PlayIncorrectSound();
+            }
+        }
+    }
+
     public bool IsLevelActive() {
         return levelActive;
+    }
+
+    //Takes a transform and returns the LevelManager that manages the object that transform is attached to
+    public static LevelManager GetLevelManagerForTransform(Transform transform) {
+        Transform t = transform;
+        LevelManager levelManager = null;
+
+        while (t.parent != null) {
+            if (t.parent.tag == "LevelManagerObject") {
+                levelManager = t.parent.gameObject.GetComponent<LevelManager>();
+                break;
+            } else {
+                t = t.parent.transform;
+            }
+        }
+
+        return levelManager;
     }
 }

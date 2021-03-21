@@ -18,4 +18,7 @@ public class SpiderLevelTwo : LevelManager {
     public override void Update() {
         base.Update();
     }
+
+    protected override void HandleLevelEnd() {
+    }
 }

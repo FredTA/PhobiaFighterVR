@@ -13,25 +13,47 @@ public class UIManager : MonoBehaviour {
     public Text sudsPreviewText;
     public Slider sudsSlider;
 
+    public AudioSource correct;
+    public AudioSource incorrect;
+    private float timerStartTime = -1;
+    private const float SCORE_HIGHLIGHT_DURATION = 1;
+    private Color scoreDisplayColor;
+
     private PhobiaSceneManager sceneManager;
 
     // Start is called before the first frame update
     void Awake() {
         sceneManager = GameObject.FindGameObjectWithTag("SceneManagerObject").GetComponent<PhobiaSceneManager>();
+        scoreDisplayColor = scoreText.color;
     }
 
     // Update is called once per frame
     void Update() {
-        
+        if (timerStartTime != -1) {
+            if (Time.time > timerStartTime + SCORE_HIGHLIGHT_DURATION) {
+                timerStartTime = -1;
+                scoreText.color = scoreDisplayColor;
+                highscoreText.color = scoreDisplayColor;
+            }
+        }
     }
 
     public void UpdateInfo(int level, int highscore) {
-        levelText.text = "LEVEL: " + (level+1).ToString(); // +1 as level 0 in the code is level 1 to the player 
-        highscoreText.text = "HIGHSCORE: " + highscore.ToString();
+        levelText.text = (level+1).ToString(); // +1 as level 0 in the code is level 1 to the player 
+        highscoreText.text = highscore.ToString();
     }
 
     public void UpdateScore(int score) {
-        scoreText.text = "SCORE: " + score;
+        if (score > int.Parse(scoreText.text)) {
+            timerStartTime = Time.time;
+            scoreText.color = Color.green;
+
+            if (score > int.Parse(highscoreText.text)) {
+                highscoreText.color = Color.green;
+                highscoreText.text = score.ToString() ;
+            }
+        }
+        scoreText.text = score.ToString();
 
     }
 
@@ -86,6 +108,14 @@ public class UIManager : MonoBehaviour {
             LevelManager.score = 100;
         }
         Debug.Log("Score is " + LevelManager.score);
+    }
+
+    public void PlayCorrectSound() {
+        correct.Play();
+    }
+
+    public void PlayIncorrectSound() {
+        incorrect.Play();
     }
 
 }

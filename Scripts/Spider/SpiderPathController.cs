@@ -31,6 +31,8 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
         None
     }
 
+    public bool extraDebug = false;
+
     private const float BASE_TURN_SPEED = 1.6f;
     private const float BASE_SPEED = 0.13f;
 
@@ -68,8 +70,8 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
 
     //Spider avoidance
     public int priority;
-    private const float MINIMUM_SPIDER_AVOID_DISTANCE = 0.15f;
-    private const float MAXIMUM_SPIDER_AVOID_DISTANCE = 0.25f;
+    private const float MINIMUM_SPIDER_AVOID_DISTANCE = 0.25f;
+    private const float MAXIMUM_SPIDER_AVOID_DISTANCE = 0.35f;
     public bool ableToAvoidOtherSpiders = false;
     private GameObject[] spiders;
     public GameObject spiderBeingAvoided = null;
@@ -78,9 +80,9 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
     private float closestSpiderDistance;
     private float closestSpiderAngle;
     private bool spiderToAvoidIsInSector = false;
-    private const float SPIDER_AVOID_SECTOR_LENGTH = 0.3f;
+    private const float SPIDER_AVOID_SECTOR_LENGTH = 0.45f;
     private const float SPIDER_AVOIDANCE_SECTOR_MIN_ANGLE = 10;
-    private const float SPIDER_AVOIDANCE_SECTOR_MAX_ANGLE = 40;
+    private const float SPIDER_AVOIDANCE_SECTOR_MAX_ANGLE = 45;
     private const float BASE_AVOID_TURN_SPEED = 0.7f;
 
     private const float ADDITIONAL_WAIT_TIME = 1f;
@@ -92,7 +94,7 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
     private const float ANGLE_ACCEPTANCE_THRESHOLD = 3;
 
     //Debugging
-    public bool debugEnabled = true;
+    public bool debugEnabled = false;
     private Vector3 debugOffset = new Vector3(0, 0.02f, 0);
     private const float DEBUG_RAY_LENGTH_MULTIPLIER = 0.25f;
     private const float DEBUG_RAY_LENGTH_AVOID_MULTIPLIER = 2f;
@@ -106,10 +108,10 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
     private const float TURN_FROM_BORDER_MULTIPLER = 2f;
 
     void Awake() {
-        animationController = gameObject.GetComponent<SpiderAnimationController>();
+        animationController = GetComponent<SpiderAnimationController>(); 
         spiders = GameObject.FindGameObjectsWithTag("SpiderCluster");
         Vector3 tableCentreObjectPosition = GameObject.FindGameObjectWithTag("TableCentre").transform.position;
-        tableCentrePosition = new Vector3(tableCentreObjectPosition.x, transform.position.y, tableCentreObjectPosition.z);
+        tableCentrePosition = new Vector3(tableCentreObjectPosition.x, tableCentreObjectPosition.y, tableCentreObjectPosition.z);
 
         leftBorderX = GameObject.Find("LeftBorderStart").transform.position.x;
         rightBorderX = GameObject.Find("RightBorderStart").transform.position.x;
@@ -119,19 +121,19 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
 
     // Start is called before the first frame update
     void Start() {
-        //currentMovementStage = MovementStage.RandomWait1;
-        //PrepareRandomWaitStage();
+        currentMovementStage = MovementStage.RandomWait1;
+        PrepareRandomWaitStage();
         borderBoundaryLength = GameObject.Find("TableBorders").GetComponent<BorderController>().getBorderDistance(); //must come after BC init
 
         //todo remove, for debugging
-        debugEnabled = true;
-        currentMovementStage = MovementStage.WalkStage;
-        currentWalkStage = WalkStage.Forward;
-        walkStageDuration = 1000;
-        randomWalkSpeed = BASE_SPEED * 1f;
-        walkMultiplier = 1.5f;
-        animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.walking);
-        animationController.SetSpeed(walkMultiplier * WALKING_ANIMATION_SPEED_MULTIPLIER);
+        //debugEnabled = true;
+        //currentMovementStage = MovementStage.WalkStage;
+        //currentWalkStage = WalkStage.Forward;
+        //walkStageDuration = 1000;
+        //randomWalkSpeed = BASE_SPEED * 1f;
+        //walkMultiplier = 1.5f;
+        //animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.walking);
+        //animationController.SetSpeed(walkMultiplier * WALKING_ANIMATION_SPEED_MULTIPLIER);
     }
 
     // Update is called once per frame
@@ -211,6 +213,11 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
     private void PrepareTurnOnTheSpotStage() {
         SetRandomTurnOnTheSpotAngle(out float angle);
         randomRotateSpeed = Random.Range(TURN_ON_THE_SPOT_MIN_SPEED, TURN_ON_THE_SPOT_MAX_SPEED);
+
+        float animationMultiplier = randomRotateSpeed / TURN_ON_THE_SPOT_MIN_SPEED;
+        //Debug.Log("Prepare TOS anim speed " + animationMultiplier * TURNING_ANIMATION_SPEED_MULTIPLIER);
+        animationController.SetSpeed(animationMultiplier * TURNING_ANIMATION_SPEED_MULTIPLIER);
+
         //Debug.Log("Angle: " + angle);
         if (angle < 0) {
             animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.turnleft);
@@ -220,13 +227,16 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
             animationController.SetAnimation(SpiderAnimationController.SpiderAnimations.turnright);
             //Debug.Log("CW");
         }
-
-        float animationMultiplier = randomRotateSpeed / TURN_ON_THE_SPOT_MIN_SPEED;
-        animationController.SetSpeed(animationMultiplier * TURNING_ANIMATION_SPEED_MULTIPLIER);
     }
 
     private void HandleTurnOnTheSpotStage() {
-        if (transform.forward != targetDir) {
+        //If we're within the threshold, snap to the correct rotation and move to the next stage
+        if (transform.forward != targetDir && Vector3.Angle(transform.forward, targetDir) < ANGLE_ACCEPTANCE_THRESHOLD) {
+            transform.rotation = Quaternion.LookRotation(targetDir);
+            NextMovementStage();
+        } else if (transform.forward == targetDir) {
+            NextMovementStage();
+        } else if (transform.forward != targetDir) {
             TurnToTargetDirection(randomRotateSpeed, targetDir, false);
 
             if (debugEnabled) {
@@ -234,9 +244,7 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
                 Debug.DrawRay(transform.position + debugOffset, targetDir * DEBUG_RAY_LENGTH_MULTIPLIER, Color.blue);
             }
         }
-        else {
-            NextMovementStage();
-        }
+
     }
 
     private void SetWalkStage(WalkStage newWalkStage) {
@@ -385,10 +393,10 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
 
                     if (gameObject.name == "DefaultSpider") {
                         if (spiderToAvoidIsInSector) {
-                            Debug.Log(closestSpider.gameObject.name + " IS IN SECTOR - ANGLE: " + closestSpiderAngle + " MULT: " + turnSpeedMultiplier);
+                            //Debug.Log(closestSpider.gameObject.name + " IS IN SECTOR - ANGLE: " + closestSpiderAngle + " MULT: " + turnSpeedMultiplier);
                         }
                         else {
-                            Debug.Log(closestSpider.gameObject.name + " IS IN CIRCLE - DISTANCE: " + closestSpiderDistance + " MULT: " + turnSpeedMultiplier);
+                            //Debug.Log(closestSpider.gameObject.name + " IS IN CIRCLE - DISTANCE: " + closestSpiderDistance + " MULT: " + turnSpeedMultiplier);
                         }
                     }
                 }
@@ -446,8 +454,6 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
     //otherwise returns the closest spider in the circle, if there is one, otherwise returns null
 
     private GameObject FindClosestSpider() {
-        GameObject closestSpider = null;
-
         GameObject closestSpiderByDistance = FindClosestSpiderByDistance(out float distanceToClosestSpiderByDistance);
 
         if (distanceToClosestSpiderByDistance < MAXIMUM_SPIDER_AVOID_DISTANCE) {
@@ -536,22 +542,20 @@ public class SpiderPathController : MonoBehaviour { //TODO animations need some 
     private void TurnToTargetDirection(float rotateSpeed, Vector3 target, bool turningFromBorder) {
         //Need to take the y component out, we don't want our elevation to change (flying spiders = bad = oh god please no) 
         Vector3 correctedTarget = new Vector3(target.x, transform.forward.y, target.z);
+        float step = rotateSpeed * Time.deltaTime;
 
-        Vector3 newDir;
-        if (Vector3.Angle(transform.forward, target) > ANGLE_ACCEPTANCE_THRESHOLD) {
-            float step = rotateSpeed * Time.deltaTime;
-
-            if (turningFromBorder) {
-                correctedTarget = GetBorderTurnDirection();
-            }
-           
-            newDir = Vector3.RotateTowards(transform.forward, correctedTarget, step, 0.0f); 
-        } else {
-            newDir = correctedTarget;
+        if (turningFromBorder) {
+            correctedTarget = GetBorderTurnDirection();
         }
 
+        Vector3 newDir = Vector3.RotateTowards(transform.forward, correctedTarget, step, 0.0f); 
         Vector3 correctedNewDir = new Vector3(newDir.x, transform.forward.y, newDir.z);
-        transform.rotation = Quaternion.LookRotation(newDir);
+
+        if (extraDebug) {
+            Debug.Log("Target: " + correctedTarget.ToString("F4") + " Forward: " + transform.forward.ToString("F4") + " new dir: " + correctedNewDir.ToString("F4") + " - " + (transform.forward == targetDir).ToString());
+        }
+
+        transform.rotation = Quaternion.LookRotation(correctedNewDir);
     }
 
     //Returns a value between 0 and 1 depending on how far between the start/end borders the spider is

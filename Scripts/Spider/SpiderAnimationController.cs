@@ -10,9 +10,16 @@ public class SpiderAnimationController : MonoBehaviour {
     private IEnumerator coroutine;
     private float animationScaleMultiplier;
 
+    private float idleSpeed;
+    private const float BASE_IDLE_SPEED = 2.3f;
+    private const float FALLING_ANIM_SPEED = 0.2f;
+
     void Awake () {
         animationScaleMultiplier = GameObject.Find("DefaultSpider").transform.lossyScale.magnitude / transform.lossyScale.magnitude;
-        Debug.Log(gameObject.name + ": " + transform.lossyScale.magnitude + ": " + animationScaleMultiplier);
+    }
+
+    public void UpdateIdleSpeed(float multiplier) {
+        idleSpeed = BASE_IDLE_SPEED * multiplier;
     }
 	
     IEnumerator idle()
@@ -35,7 +42,7 @@ public class SpiderAnimationController : MonoBehaviour {
 
     public enum SpiderAnimations {
         idle,
-        idle2,
+        //idle2, TODO this is borked, not using it anyway
         walking,
         running,
         turnleft,
@@ -61,9 +68,9 @@ public class SpiderAnimationController : MonoBehaviour {
                 spider.SetBool("idle", true);
                 //StartCoroutine("idle");
                 break;
-            case SpiderAnimations.idle2:
-                //StartCoroutine("idle2");
-                break;
+            //case SpiderAnimations.idle2:
+            //    //StartCoroutine("idle2");
+            //    break;
             case SpiderAnimations.walking:
                 spider.SetBool("walking", true);
                 break;
@@ -93,7 +100,7 @@ public class SpiderAnimationController : MonoBehaviour {
                 spider.SetBool("attack2", true);
                 break;
         }
-        //Debug.Log("Setting anim " + GetCurrentAnimation().ToString());
+        //Debug.Log("Setting anim " + animation.ToString() + " at speed: " + GetSpeed());
     }
 
     public SpiderAnimations GetCurrentAnimation() {
@@ -107,10 +114,53 @@ public class SpiderAnimationController : MonoBehaviour {
 
     public void SetSpeed(float speed) {
         spider.speed = speed * animationScaleMultiplier;
+        //Debug.Log("Setting speed: " + speed);
+    }
+
+    public void SetFallingSpeed() {
+        spider.speed = FALLING_ANIM_SPEED;
     }
 
     public float GetSpeed() {
         return spider.speed;
+    }
+
+    public void Disable() {
+        spider.enabled = false;
+    }
+
+    public void Enable() {
+        spider.enabled = true;
+    }
+
+    public bool IsAnimatorEnabled() {
+        return spider.enabled;
+    }
+
+
+    public void ToggleRootMotion(bool root) {
+        spider.applyRootMotion = root;
+    }
+
+    public bool GetRootMotion() {
+        return spider.applyRootMotion;
+    }
+
+    private float pausedSpeed = -1;
+    private SpiderAnimations pausedAnimation;
+
+    public void ToggleIdleHeld(bool held) {
+        if (held && pausedSpeed == -1) {
+            pausedSpeed = spider.speed;
+            pausedAnimation = GetCurrentAnimation();
+
+            SetSpeed(idleSpeed);
+            SetAnimation(SpiderAnimations.walking);
+        } else if (!held && pausedSpeed != -1) {
+                SetSpeed(pausedSpeed);
+                SetAnimation(pausedAnimation);
+                pausedSpeed = -1;
+        }
     }
 
 }
